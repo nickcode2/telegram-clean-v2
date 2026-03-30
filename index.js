@@ -1,3 +1,5 @@
+console.log("🔥 NEW DEPLOY TEST")
+
 const express = require('express')
 const TelegramBot = require('node-telegram-bot-api')
 const OpenAI = require('openai')
