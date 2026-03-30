@@ -7,7 +7,7 @@ const app = express()
 app.use(express.json())
 
 app.get('/', (req, res) => {
-  res.send('OK')
+  res.status(200).send('OK')
 })
 
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true })
@@ -22,13 +22,13 @@ const replicate = new Replicate({
 
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id
-  const text = msg.text
+  const text = (msg.text || '').trim().toLowerCase()
 
   if (!text) return
 
-  if (text.trim().toLowerCase() === 'do it') {
+  if (text === 'do it') {
     await bot.sendMessage(chatId, 'Starting 10s pipeline...')
-    runTest(chatId)
+    await runTest(chatId)
     return
   }
 
@@ -47,7 +47,9 @@ async function runTest(chatId) {
       ]
     })
 
-    const theme = themeRes.choices[0].message.content.trim()
+    const theme = themeRes.choices?.[0]?.message?.content?.trim()
+    if (!theme) throw new Error('OpenAI did not return a theme')
+
     await bot.sendMessage(chatId, `THEME:\n${theme}`)
 
     const p1 = await openai.chat.completions.create({
@@ -55,12 +57,13 @@ async function runTest(chatId) {
       messages: [
         {
           role: 'user',
-          content: `Create ONE ultra realistic image prompt for a YouTube documentary thumbnail style frame about: ${theme}. Keep it grounded, photoreal, cinematic, clean, no fantasy. Return only the prompt.`
+          content: `Create ONE ultra realistic image prompt for a YouTube documentary frame about: ${theme}. Keep it grounded, photoreal, cinematic, clean, no fantasy. Return only the prompt.`
         }
       ]
     })
 
-    const prompt1 = p1.choices[0].message.content.trim()
+    const prompt1 = p1.choices?.[0]?.message?.content?.trim()
+    if (!prompt1) throw new Error('OpenAI did not return prompt 1')
     await bot.sendMessage(chatId, `Prompt 1:\n${prompt1}`)
 
     const p2 = await openai.chat.completions.create({
@@ -73,7 +76,8 @@ async function runTest(chatId) {
       ]
     })
 
-    const prompt2 = p2.choices[0].message.content.trim()
+    const prompt2 = p2.choices?.[0]?.message?.content?.trim()
+    if (!prompt2) throw new Error('OpenAI did not return prompt 2')
     await bot.sendMessage(chatId, `Prompt 2:\n${prompt2}`)
 
     await bot.sendMessage(chatId, '🖼 Generating image 1...')
@@ -85,33 +89,52 @@ async function runTest(chatId) {
     await bot.sendPhoto(chatId, img2)
 
     await bot.sendMessage(chatId, '✅ Images done')
-
   } catch (err) {
     console.error('MAIN ERROR:', err)
-    await bot.sendMessage(chatId, `❌ ERROR:\n${err.message || err}`)
+    await bot.sendMessage(chatId, `❌ ERROR:\n${err?.message || String(err)}`)
   }
 }
 
 async function generateImage(promptText) {
   try {
-    const output = await replicate.run(
-      "black-forest-labs/flux-1.1-pro",
-      {
-        input: {
-          prompt: promptText,
-          aspect_ratio: "16:9"
-        }
-      }
-    )
+    console.log('GENERATE IMAGE PROMPT:', promptText)
 
-    console.log("OUTPUT:", output)
+    const output = await replicate.run('black-forest-labs/flux-2-max', {
+      input: {
+        prompt: promptText,
+        aspect_ratio: '16:9'
+      }
+    })
+
+    console.log('REPLICATE OUTPUT:', output)
 
     if (!output) {
-      throw new Error("No output from Replicate")
+      throw new Error('Replicate returned no output')
     }
 
-    return Array.isArray(output) ? output[0] : output
+    if (Array.isArray(output) && output.length > 0) {
+      const first = output[0]
 
+      if (typeof first === 'string') return first
+      if (first && typeof first.url === 'function') return first.url()
+      if (first && typeof first === 'object' && typeof first.url === 'string') return first.url
+
+      throw new Error('Replicate returned an unsupported array output shape')
+    }
+
+    if (typeof output === 'string') {
+      return output
+    }
+
+    if (output && typeof output.url === 'function') {
+      return output.url()
+    }
+
+    if (output && typeof output === 'object' && typeof output.url === 'string') {
+      return output.url
+    }
+
+    throw new Error('Replicate returned an unsupported output shape')
   } catch (err) {
     console.error('IMAGE ERROR:', err)
     throw err
@@ -120,5 +143,5 @@ async function generateImage(promptText) {
 
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
-  console.log('Server running')
+  console.log(`Server running on port ${PORT}`)
 })
