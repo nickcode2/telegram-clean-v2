@@ -94,11 +94,10 @@ async function runTest(chatId) {
 
 async function generateImage(promptText) {
   const output = await replicate.run(
-    "black-forest-labs/flux-2-max",
+    "stability-ai/sdxl",
     {
       input: {
-        prompt: promptText,
-        aspect_ratio: "16:9"
+        prompt: promptText
       }
     }
   )
@@ -106,14 +105,10 @@ async function generateImage(promptText) {
   console.log("OUTPUT:", output)
 
   if (!output) {
-    throw new Error("No output from Replicate")
+    throw new Error("No output")
   }
 
-  if (Array.isArray(output)) {
-    return output[0]
-  }
-
-  return output
+  return Array.isArray(output) ? output[0] : output
 }
 
 const PORT = process.env.PORT || 3000
