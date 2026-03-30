@@ -88,7 +88,7 @@ async function runTest(chatId) {
 
   } catch (err) {
     console.error('MAIN ERROR:', err)
-    await bot.sendMessage(chatId, 'Error occurred')
+    await bot.sendMessage(chatId, `❌ ERROR:\n${err.message || err}`)
   }
 }
 
