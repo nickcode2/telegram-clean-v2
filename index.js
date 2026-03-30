@@ -99,46 +99,26 @@ async function runTest(chatId) {
 
 async function generateImage(promptText) {
   try {
-    console.log('GENERATE IMAGE PROMPT:', promptText)
-
-    const output = await replicate.run('black-forest-labs/flux-2-max', {
-      input: {
-        prompt: promptText,
-        aspect_ratio: '16:9'
+    const output = await replicate.run(
+      "black-forest-labs/flux-2-max:latest",
+      {
+        input: {
+          prompt: promptText,
+          aspect_ratio: "16:9"
+        }
       }
-    })
+    )
 
-    console.log('REPLICATE OUTPUT:', output)
+    console.log("OUTPUT:", output)
 
     if (!output) {
-      throw new Error('Replicate returned no output')
+      throw new Error("No output from Replicate")
     }
 
-    if (Array.isArray(output) && output.length > 0) {
-      const first = output[0]
+    return Array.isArray(output) ? output[0] : output
 
-      if (typeof first === 'string') return first
-      if (first && typeof first.url === 'function') return first.url()
-      if (first && typeof first === 'object' && typeof first.url === 'string') return first.url
-
-      throw new Error('Replicate returned an unsupported array output shape')
-    }
-
-    if (typeof output === 'string') {
-      return output
-    }
-
-    if (output && typeof output.url === 'function') {
-      return output.url()
-    }
-
-    if (output && typeof output === 'object' && typeof output.url === 'string') {
-      return output.url
-    }
-
-    throw new Error('Replicate returned an unsupported output shape')
   } catch (err) {
-    console.error('IMAGE ERROR:', err)
+    console.error("IMAGE ERROR FULL:", err)
     throw err
   }
 }
