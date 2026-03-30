@@ -1,9 +1,9 @@
-console.log("🔥 NEW DEPLOY TEST")
-
 const express = require('express')
 const TelegramBot = require('node-telegram-bot-api')
 const OpenAI = require('openai')
 const Replicate = require('replicate')
+
+console.log('NEW FLUX PRO DEPLOY')
 
 const app = express()
 app.use(express.json())
@@ -82,43 +82,62 @@ async function runTest(chatId) {
     if (!prompt2) throw new Error('OpenAI did not return prompt 2')
     await bot.sendMessage(chatId, `Prompt 2:\n${prompt2}`)
 
-    await bot.sendMessage(chatId, '🖼 Generating image 1...')
+    await bot.sendMessage(chatId, 'Generating image 1...')
     const img1 = await generateImage(prompt1)
     await bot.sendPhoto(chatId, img1)
 
-    await bot.sendMessage(chatId, '🖼 Generating image 2...')
+    await bot.sendMessage(chatId, 'Generating image 2...')
     const img2 = await generateImage(prompt2)
     await bot.sendPhoto(chatId, img2)
 
-    await bot.sendMessage(chatId, '✅ Images done')
+    await bot.sendMessage(chatId, 'Images done')
   } catch (err) {
     console.error('MAIN ERROR:', err)
-    await bot.sendMessage(chatId, `❌ ERROR:\n${err?.message || String(err)}`)
+    await bot.sendMessage(chatId, `ERROR:\n${err?.message || String(err)}`)
   }
 }
 
 async function generateImage(promptText) {
   try {
-    const output = await replicate.run(
-      "black-forest-labs/flux-2-max:latest",
-      {
-        input: {
-          prompt: promptText,
-          aspect_ratio: "16:9"
-        }
-      }
-    )
+    console.log('GENERATE IMAGE PROMPT:', promptText)
 
-    console.log("OUTPUT:", output)
+    const output = await replicate.run('black-forest-labs/flux-2-pro', {
+      input: {
+        prompt: promptText
+      }
+    })
+
+    console.log('REPLICATE OUTPUT:', output)
 
     if (!output) {
-      throw new Error("No output from Replicate")
+      throw new Error('Replicate returned no output')
     }
 
-    return Array.isArray(output) ? output[0] : output
+    if (Array.isArray(output) && output.length > 0) {
+      const first = output[0]
 
+      if (typeof first === 'string') return first
+      if (first && typeof first.url === 'function') return first.url()
+      if (first && typeof first === 'object' && typeof first.url === 'string') return first.url
+
+      throw new Error('Unsupported Replicate array output')
+    }
+
+    if (typeof output === 'string') {
+      return output
+    }
+
+    if (output && typeof output.url === 'function') {
+      return output.url()
+    }
+
+    if (output && typeof output === 'object' && typeof output.url === 'string') {
+      return output.url
+    }
+
+    throw new Error('Unsupported Replicate output format')
   } catch (err) {
-    console.error("IMAGE ERROR FULL:", err)
+    console.error('IMAGE ERROR:', err)
     throw err
   }
 }
