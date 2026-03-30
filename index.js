@@ -93,42 +93,50 @@ async function runTest(chatId) {
 }
 
 async function generateImage(promptText) {
-  try {
-    const output = await replicate.run(
-      'black-forest-labs/flux-2-max',
-      {
-        input: {
-          prompt: promptText,
-          aspect_ratio: '16:9'
-        }
+  const res = await fetch('https://api.replicate.com/v1/predictions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Token ${process.env.REPLICATE_API_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      version: "c221b2b8ef527988ecf4b6a6cde2baf9d1d6dbe2f5d5a63d315ff78eaefdd8af",
+      input: {
+        prompt: promptText
       }
-    )
+    })
+  })
 
-    console.log('REPLICATE OUTPUT:', output)
+  const data = await res.json()
 
-    if (!output) {
-      throw new Error('No output from Replicate')
-    }
+  console.log('STEP 1 RESPONSE:', JSON.stringify(data, null, 2))
 
-    if (Array.isArray(output) && output.length > 0) {
-      const first = output[0]
-      if (typeof first === 'string') return first
-      if (first && typeof first.url === 'function') return first.url()
-    }
-
-    if (typeof output === 'string') {
-      return output
-    }
-
-    if (output && typeof output.url === 'function') {
-      return output.url()
-    }
-
-    throw new Error('Unsupported Replicate output format')
-  } catch (err) {
-    console.error('IMAGE ERROR:', err)
-    throw err
+  if (!data.urls || !data.urls.get) {
+    throw new Error('Replicate did not return polling URL')
   }
+
+  let result
+
+  while (true) {
+    await new Promise(r => setTimeout(r, 3000))
+
+    const check = await fetch(data.urls.get, {
+      headers: {
+        Authorization: `Token ${process.env.REPLICATE_API_TOKEN}`
+      }
+    })
+
+    result = await check.json()
+
+    console.log('POLL:', result.status)
+
+    if (result.status === 'succeeded') break
+    if (result.status === 'failed') throw new Error('Replicate failed')
+  }
+
+  console.log('FINAL:', JSON.stringify(result, null, 2))
+
+  return result.output[0]
 }
 
 const PORT = process.env.PORT || 3000
