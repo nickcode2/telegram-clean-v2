@@ -91,18 +91,17 @@ async function generateImage(promptText) {
         Authorization: `Token ${process.env.REPLICATE_API_TOKEN}`,
         'Content-Type': 'application/json'
       },
-     body: JSON.stringify({
-  model: "black-forest-labs/flux-2-max",
-  input: {
-    prompt: promptText,
-    aspect_ratio: "16:9"
-  }
-})
+      body: JSON.stringify({
+        version: "c221b2b8ef527988ecf4b6a6cde2baf9d1d6dbe2f5d5a63d315ff78eaefdd8af",
+        input: {
+          prompt: promptText,
+          aspect_ratio: "16:9"
+        }
+      })
     })
 
     const prediction = await start.json()
 
-    // DEBUG
     if (!prediction.id) {
       console.log('FULL ERROR:', JSON.stringify(prediction, null, 2))
       throw new Error('Replicate start failed')
