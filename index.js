@@ -93,50 +93,27 @@ async function runTest(chatId) {
 }
 
 async function generateImage(promptText) {
-  const res = await fetch('https://api.replicate.com/v1/predictions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Token ${process.env.REPLICATE_API_TOKEN}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      version: "c221b2b8ef527988ecf4b6a6cde2baf9d1d6dbe2f5d5a63d315ff78eaefdd8af",
+  const output = await replicate.run(
+    "black-forest-labs/flux-2-max",
+    {
       input: {
-        prompt: promptText
+        prompt: promptText,
+        aspect_ratio: "16:9"
       }
-    })
-  })
+    }
+  )
 
-  const data = await res.json()
+  console.log("OUTPUT:", output)
 
-  console.log('STEP 1 RESPONSE:', JSON.stringify(data, null, 2))
-
-  if (!data.urls || !data.urls.get) {
-    throw new Error('Replicate did not return polling URL')
+  if (!output) {
+    throw new Error("No output from Replicate")
   }
 
-  let result
-
-  while (true) {
-    await new Promise(r => setTimeout(r, 3000))
-
-    const check = await fetch(data.urls.get, {
-      headers: {
-        Authorization: `Token ${process.env.REPLICATE_API_TOKEN}`
-      }
-    })
-
-    result = await check.json()
-
-    console.log('POLL:', result.status)
-
-    if (result.status === 'succeeded') break
-    if (result.status === 'failed') throw new Error('Replicate failed')
+  if (Array.isArray(output)) {
+    return output[0]
   }
 
-  console.log('FINAL:', JSON.stringify(result, null, 2))
-
-  return result.output[0]
+  return output
 }
 
 const PORT = process.env.PORT || 3000
